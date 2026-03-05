@@ -4,6 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <title>Siber Savaşçı: Pro Sürüm</title>
+    <meta name="description" content="Siber Savaşçı - Bossları yen, zamanı durdur ve en yüksek skoru yap! Ücretsiz arcade shooter oyunu.">
+    <meta name="keywords" content="Siber Savaşçı, siber savaşçı oyunu, shooter, web oyunu, zamanı durdurma oyunu">
+    <meta name="author" content="Siber Savaşçı Geliştiricisi">
+    
     <style>
         body { margin: 0; background: #050a10; color: #00ffcc; font-family: 'Segoe UI', sans-serif; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; }
         canvas { border: 3px solid #00ffcc; background: #000; cursor: crosshair; display: none; }
@@ -16,7 +20,7 @@
         
         /* Güncellemeler Paneli */
         #updatePanel { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 400px; background: rgba(5, 15, 25, 0.95); border: 2px solid #ffff00; padding: 40px; display: none; text-align: center; z-index: 300; box-shadow: 0 0 50px rgba(255, 255, 0, 0.2); }
-        #updatePanel h2 { color: #ffff00; font-size: 32px; letter-spacing: 5px; margin: 0; }
+        #updatePanel h2 { color: #ffff00; font-size: 28px; letter-spacing: 2px; margin: 0; }
 
         #ui { position: absolute; top: 20px; left: 20px; pointer-events: none; display: none; }
         #weaponUI { position: absolute; top: 20px; right: 20px; text-align: right; display: none; }
@@ -34,8 +38,10 @@
 </div>
 
 <div id="updatePanel" onclick="toggleUpdates()">
-    <h2>YAKINDA GELECEK</h2>
-    <p style="color: #888; margin-top: 20px; font-size: 14px;">(Kapatmak için dokunun)</p>
+    <h2>v1.6: GOOGLE SEO & GLOBAL</h2>
+    <p style="color: #00ffcc; margin-top: 15px; font-weight: bold;">Oyun Artık İnternette!</p>
+    <p style="color: #888; font-size: 14px;">GitHub sunucuları aktif edildi ve Google indeksleme altyapısı kuruldu.</p>
+    <p style="color: #555; margin-top: 20px; font-size: 12px;">(Kapatmak için dokunun)</p>
 </div>
 
 <div id="ui">
@@ -72,7 +78,6 @@ function startGame() {
     draw();
 }
 
-// --- OYUN MOTORU ---
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 const scoreEl = document.getElementById("score");
