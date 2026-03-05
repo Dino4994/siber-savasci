@@ -1,0 +1,267 @@
+
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Siber Savaşçı: Pro Sürüm</title>
+    <style>
+        body { margin: 0; background: #050a10; color: #00ffcc; font-family: 'Segoe UI', sans-serif; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        canvas { border: 3px solid #00ffcc; background: #000; cursor: crosshair; display: none; }
+        
+        /* Menü Tasarımı */
+        #mainMenu { text-align: center; z-index: 200; }
+        #mainMenu h1 { font-size: 72px; text-shadow: 0 0 20px #00ffcc; margin-bottom: 50px; }
+        .menu-btn { background: transparent; border: 2px solid #00ffcc; color: #00ffcc; padding: 15px 50px; font-size: 24px; font-weight: bold; cursor: pointer; border-radius: 5px; margin: 10px; transition: 0.3s; width: 350px; }
+        .menu-btn:hover { background: #00ffcc; color: #000; box-shadow: 0 0 20px #00ffcc; }
+        
+        /* Güncellemeler Paneli */
+        #updatePanel { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 400px; background: rgba(5, 15, 25, 0.95); border: 2px solid #ffff00; padding: 40px; display: none; text-align: center; z-index: 300; box-shadow: 0 0 50px rgba(255, 255, 0, 0.2); }
+        #updatePanel h2 { color: #ffff00; font-size: 32px; letter-spacing: 5px; margin: 0; }
+
+        #ui { position: absolute; top: 20px; left: 20px; pointer-events: none; display: none; }
+        #weaponUI { position: absolute; top: 20px; right: 20px; text-align: right; display: none; }
+        .ability-bar { width: 250px; height: 12px; background: #333; border-radius: 6px; margin-top: 5px; border: 1px solid #00ffcc; overflow: hidden; }
+        #abilityFill { height: 100%; width: 0%; background: #00bfff; transition: width 0.1s linear; }
+        .msg { position: absolute; text-align: center; width: 100%; display: none; background: rgba(0,0,0,0.9); padding: 20px; z-index: 100; }
+    </style>
+</head>
+<body>
+
+<div id="mainMenu">
+    <h1>SİBER SAVAŞÇI</h1>
+    <button class="menu-btn" onclick="startGame()">OYNA</button><br>
+    <button class="menu-btn" onclick="toggleUpdates()">GÜNCELLEMELER</button>
+</div>
+
+<div id="updatePanel" onclick="toggleUpdates()">
+    <h2>YAKINDA GELECEK</h2>
+    <p style="color: #888; margin-top: 20px; font-size: 14px;">(Kapatmak için dokunun)</p>
+</div>
+
+<div id="ui">
+    <div style="font-size: 28px; font-weight: bold;">SKOR: <span id="score">0</span></div>
+    <div id="statusText">ZAMAN DOLUYOR...</div>
+    <div class="ability-bar"><div id="abilityFill"></div></div>
+</div>
+
+<div id="weaponUI">
+    <div id="w1" style="color:#ffff00; font-weight: bold;">TABANCA</div>
+    <div id="w2" style="color:#444">SNIPER (KİLİTLİ)</div>
+    <div id="sniperCD" style="font-size: 12px; color: #ff0055; height: 15px;"></div>
+</div>
+
+<div id="msg" class="msg">
+    <h1 style="color: #ff0055; font-size: 48px;">SİSTEM ÇÖKTÜ</h1>
+    <button class="menu-btn" onclick="location.reload()">ANA MENÜYE DÖN</button>
+</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+function toggleUpdates() {
+    const panel = document.getElementById("updatePanel");
+    panel.style.display = panel.style.display === "block" ? "none" : "block";
+}
+
+function startGame() {
+    document.getElementById("mainMenu").style.display = "none";
+    document.getElementById("gameCanvas").style.display = "block";
+    document.getElementById("ui").style.display = "block";
+    document.getElementById("weaponUI").style.display = "block";
+    gameActive = true;
+    draw();
+}
+
+// --- OYUN MOTORU ---
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+const scoreEl = document.getElementById("score");
+const abilityFill = document.getElementById("abilityFill");
+const statusText = document.getElementById("statusText");
+const msgEl = document.getElementById("msg");
+
+canvas.width = 800;
+canvas.height = 700;
+
+let score = 0;
+let gameActive = false;
+let isTimeStopped = false;
+let abilityEnergy = 0;
+let hasSniper = false;
+let currentWeapon = 1; 
+let sniperReady = true;
+let bossSpawned1000 = false;
+let bossSpawned5000 = false;
+let bossSpawned10000 = false;
+
+let player = { x: 400, y: 600, size: 25, color: "#00ffcc", speed: 6 };
+let enemies = [];
+let bullets = [];
+let enemyBullets = [];
+let particles = [];
+let boss = null;
+let frameCount = 0;
+let mousePos = { x: 0, y: 0 };
+
+const keys = { w: false, a: false, s: false, d: false };
+
+window.addEventListener("keydown", (e) => {
+    if (!gameActive) return;
+    const key = e.key.toLowerCase();
+    if (keys.hasOwnProperty(key)) keys[key] = true;
+    if (key === 'e' && abilityEnergy >= 100 && !isTimeStopped) startTimeStop();
+    if (key === 'q' && hasSniper) switchWeapon();
+});
+
+window.addEventListener("keyup", (e) => {
+    const key = e.key.toLowerCase();
+    if (keys.hasOwnProperty(key)) keys[key] = false;
+});
+
+canvas.addEventListener("mousemove", (e) => {
+    const rect = canvas.getBoundingClientRect();
+    mousePos.x = e.clientX - rect.left;
+    mousePos.y = e.clientY - rect.top;
+});
+
+canvas.addEventListener("mousedown", (e) => { if (e.button === 0 && gameActive) shoot(); });
+
+function switchWeapon() {
+    currentWeapon = currentWeapon === 1 ? 2 : 1;
+    document.getElementById("w1").style.color = currentWeapon === 1 ? "#ffff00" : "#444";
+    document.getElementById("w2").style.color = currentWeapon === 2 ? "#ffff00" : "#444";
+}
+
+function shoot() {
+    if (currentWeapon === 2 && !sniperReady) return;
+    const angle = Math.atan2(mousePos.y - (player.y + player.size/2), mousePos.x - (player.x + player.size/2));
+    bullets.push({
+        x: player.x + player.size/2,
+        y: player.y + player.size/2,
+        vx: Math.cos(angle) * (currentWeapon === 2 ? 25 : 14),
+        vy: Math.sin(angle) * (currentWeapon === 2 ? 25 : 14),
+        size: currentWeapon === 2 ? 10 : 5,
+        damage: currentWeapon === 2 ? 10 : 1,
+        type: currentWeapon
+    });
+
+    if (currentWeapon === 2) {
+        sniperReady = false;
+        document.getElementById("sniperCD").innerText = "SOĞUYOR...";
+        setTimeout(() => { sniperReady = true; document.getElementById("sniperCD").innerText = ""; }, 1000);
+    }
+}
+
+function startTimeStop() {
+    isTimeStopped = true;
+    abilityEnergy = 0;
+    statusText.textContent = "ZAMAN DURDU!";
+    setTimeout(() => { isTimeStopped = false; statusText.textContent = "ZAMAN DOLUYOR..."; }, 3000);
+}
+
+function spawnBoss(type) {
+    let hp = (type === 1000) ? 200 : (type === 5000 ? 500 : 1500);
+    boss = { x: 340, y: -120, size: 120, hp: hp, maxHp: hp, color: type === 1000 ? "#ffaa00" : (type === 5000 ? "#ff5500" : "#ff0000"), speed: 1.5, type: type };
+}
+
+function update() {
+    if (!gameActive) return;
+
+    if (keys.w && player.y > 0) player.y -= player.speed;
+    if (keys.s && player.y < canvas.height - player.size) player.y += player.speed;
+    if (keys.a && player.x > 0) player.x -= player.speed;
+    if (keys.d && player.x < canvas.width - player.size) player.x += player.speed;
+
+    if (!isTimeStopped && abilityEnergy < 100) abilityEnergy += 0.08;
+    abilityFill.style.width = abilityEnergy + "%";
+    if (abilityEnergy >= 100) statusText.textContent = "HAZIR (E)";
+
+    if (!boss) {
+        if (score >= 1000 && !bossSpawned1000) { spawnBoss(1000); bossSpawned1000 = true; }
+        else if (score >= 5000 && !bossSpawned5000) { spawnBoss(5000); bossSpawned5000 = true; }
+        else if (score >= 10000 && !bossSpawned10000) { spawnBoss(10000); bossSpawned10000 = true; }
+    }
+
+    bullets.forEach((b, i) => {
+        b.x += b.vx; b.y += b.vy;
+        if (b.x < 0 || b.x > canvas.width || b.y < 0 || b.y > canvas.height) bullets.splice(i, 1);
+    });
+
+    enemyBullets.forEach((eb, i) => {
+        if (!isTimeStopped) { eb.x += eb.vx; eb.y += eb.vy; }
+        if (eb.x > player.x && eb.x < player.x + player.size && eb.y > player.y && eb.y < player.y + player.size) endGame();
+        if (eb.x < 0 || eb.x > canvas.width || eb.y < 0 || eb.y > canvas.height) enemyBullets.splice(i, 1);
+    });
+
+    if (boss) {
+        if (!isTimeStopped) {
+            if (boss.y < 70) boss.y += 2;
+            else boss.x += Math.sin(frameCount * 0.05) * 4;
+            if (frameCount % 50 === 0) {
+                const angle = Math.atan2(player.y - (boss.y + 60), player.x - (boss.x + 60));
+                enemyBullets.push({ x: boss.x + 60, y: boss.y + 60, vx: Math.cos(angle) * 6, vy: Math.sin(angle) * 6 });
+            }
+        }
+        bullets.forEach((b, i) => {
+            if (b.x > boss.x && b.x < boss.x + boss.size && b.y > boss.y && b.y < boss.y + boss.size) {
+                boss.hp -= b.damage; createParticles(b.x, b.y, boss.color); bullets.splice(i, 1);
+                if (boss.hp <= 0) {
+                    score += 500;
+                    if (boss.type === 1000) { hasSniper = true; document.getElementById("w2").innerText = "SNIPER (Q)"; document.getElementById("w2").style.color = "#fff"; }
+                    boss = null;
+                }
+            }
+        });
+    }
+
+    frameCount++;
+    if (!isTimeStopped && !boss && frameCount % 45 === 0) {
+        const r = Math.random();
+        let eType = { color: "#ff0055", hp: 2, score: 10 };
+        if (r > 0.9) eType = { color: "#bf00ff", hp: 5, score: 30 };
+        else if (r > 0.8) eType = { color: "#00ff44", hp: 3, score: 20 };
+        enemies.push({ x: Math.random() * 750, y: -30, size: 30, ...eType, speed: 3 });
+    }
+
+    enemies.forEach((e, i) => {
+        if (!isTimeStopped) e.y += e.speed;
+        if (player.x < e.x + e.size && player.x + player.size > e.x && player.y < e.y + e.size && player.y + player.size > e.y) endGame();
+        bullets.forEach((b, j) => {
+            if (b.x > e.x && b.x < e.x + e.size && b.y > e.y && b.y < e.y + e.size) {
+                e.hp -= b.damage; createParticles(b.x, b.y, e.color); bullets.splice(j, 1);
+                if (e.hp <= 0) { score += e.score; scoreEl.innerText = score; enemies.splice(i, 1); }
+            }
+        });
+    });
+
+    particles.forEach((p, i) => { p.x += p.vx; p.y += p.vy; p.life -= 0.02; if (p.life <= 0) particles.splice(i, 1); });
+}
+
+function draw() {
+    if (!gameActive) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (isTimeStopped) { ctx.fillStyle = "rgba(0, 150, 255, 0.2)"; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+    bullets.forEach(b => { ctx.fillStyle = b.type === 2 ? "#ffff00" : "#fff"; ctx.fillRect(b.x - b.size/2, b.y - b.size/2, b.size, b.size); });
+    enemyBullets.forEach(eb => { ctx.fillStyle = "#ff0000"; ctx.beginPath(); ctx.arc(eb.x, eb.y, 7, 0, Math.PI*2); ctx.fill(); });
+    if (boss) {
+        ctx.fillStyle = boss.color; ctx.fillRect(boss.x, boss.y, boss.size, boss.size);
+        ctx.fillStyle = "#333"; ctx.fillRect(boss.x, boss.y - 20, boss.size, 10);
+        ctx.fillStyle = "#ff0000"; ctx.fillRect(boss.x, boss.y - 20, (boss.hp/boss.maxHp)*boss.size, 10);
+    }
+    enemies.forEach(e => { ctx.fillStyle = e.color; ctx.fillRect(e.x, e.y, e.size, e.size); });
+    ctx.fillStyle = player.color; ctx.fillRect(player.x, player.y, player.size, player.size);
+    particles.forEach(p => { ctx.globalAlpha = p.life; ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size); });
+    ctx.globalAlpha = 1;
+    requestAnimationFrame(draw);
+    update();
+}
+
+function createParticles(x, y, color) {
+    for (let i = 0; i < 6; i++) particles.push({ x, y, vx: (Math.random()-0.5)*7, vy: (Math.random()-0.5)*7, life: 1, color, size: 4 });
+}
+
+function endGame() { gameActive = false; msgEl.style.display = "block"; }
+
+</script>
+</body>
+</html>
